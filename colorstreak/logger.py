@@ -7,7 +7,7 @@ class log:
         "info": "\033[94m",      # Blue
         "warning": "\033[93m",   # Yellow
         "error": "\033[91m",     # Red
-        "deprecated": "\033[95m" # Magenta
+        "library": "\033[95m" # Magenta
     }
     RESET = "\033[0m"  # Reset color
 
@@ -36,5 +36,5 @@ class log:
         log._print(message, "error")
 
     @staticmethod
-    def deprecated(message):
-        log._print(message, "deprecated")
+    def library(message):
+        log._print(message, "library")
