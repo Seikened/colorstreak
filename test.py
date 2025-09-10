@@ -1,4 +1,4 @@
-from colorlogterminal import log
+from colorlogterminal import Logger
 
 
 Logger.debug("This is a debug message")
