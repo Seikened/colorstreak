@@ -1,4 +1,4 @@
-class log:
+class Logger:
     """
     Clase para manejar logs con colores, con métodos accesibles directamente como log.info(), log.warning(), etc.
     """
