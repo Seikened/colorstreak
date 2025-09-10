@@ -1,8 +1,8 @@
-from colorlogterminal import log
+from colorlogterminal import Logger
 
 
-log.debug("This is a debug message")
-log.info("This is an info message")
-log.warning("This is a warning message")
-log.error("This is an error message")
-log.deprecated("This is a deprecated message")
+Logger.debug("This is a debug message")
+Logger.info("This is an info message")
+Logger.warning("This is a warning message")
+Logger.error("This is an error message")
+Logger.deprecated("This is a deprecated message")
