@@ -1,117 +1,146 @@
+# colorstreak/logger.py
+from __future__ import annotations
+
+import os
+from typing import ClassVar
+
+
 class Logger:
     """
-    Logger minimalista con colores ANSI.
-    Retrocompatible: Logger.info("x"), Logger.error("x"), etc.
-    Soporta *args y **kwargs igual que print().
+    Minimal color logger, print-compatible.
+
+    Styles:
+      - "full":   prefix + message in the same color (default)
+      - "prefix": only prefix colored, message normal
+      - "soft":   prefix colored, message same color but dimmed
     """
 
-    COLORS = {
-        "debug":    "\033[92m",         # green
-        "info":     "\033[94m",         # blue
-        "note":     "\033[90m",         # gray
-        "step":     "\033[96m",         # cyan
-        "warning":  "\033[93m",         # yellow
-        "error":    "\033[91m",         # red
-        "critical": "\033[91m",         # red
-        "success":  "\033[92m",         # green
-        "ok":       "\033[92m",         # green
-        "fail":     "\033[91m",         # red
-        "library":  "\033[95m",         # magenta
-        "title":    "\033[1m\033[94m",  # bold blue
-        "math":     "\033[96m",         # cyan
-        "metric":   "\033[95m",         # magenta
+    RESET: ClassVar[str] = "\033[0m"
+    BOLD: ClassVar[str] = "\033[1m"
+    DIM: ClassVar[str] = "\033[2m"
+
+    COLORS: ClassVar[dict[str, str]] = {
+        "debug": "\033[92m",    # GREEN
+        "info": "\033[94m",     # BLUE
+        "warning": "\033[93m",  # YELLOW
+        "error": "\033[91m",    # RED
+        "library": "\033[95m",  # MAGENTA
+        "success": "\033[92m",  # GREEN
+
+        # --- extra helpers (still minimal) ---
+        "step": "\033[96m",     # CYAN
+        "note": "\033[90m",     # GRAY
+        "metric": "\033[95m",   # MAGENTA
+        "title": "\033[94m",    # BLUE (but bold)
     }
 
-    RESET = "\033[0m"
+    STYLE: ClassVar[str] = os.getenv("COLORSTREAK_STYLE", "full").lower()
+    ENABLED: ClassVar[bool] = os.getenv("NO_COLOR", "") == ""
+
+    @classmethod
+    def configure(cls, *, style: str | None = None, enabled: bool | None = None) -> None:
+        """
+        Configure global logger behavior.
+        - style: "full" | "prefix" | "soft"
+        - enabled: True/False (if False, prints without ANSI colors)
+        """
+        if style is not None:
+            s = style.lower().strip()
+            if s not in {"full", "prefix", "soft"}:
+                raise ValueError("style must be: 'full', 'prefix', or 'soft'")
+            cls.STYLE = s
+        if enabled is not None:
+            cls.ENABLED = bool(enabled)
 
     @staticmethod
-    def _print(message, level: str, *args, **kwargs):
-        """Internal: prints a colored [LEVEL] prefix + normal message (print-compatible)."""
-        color = Logger.COLORS.get(level, Logger.RESET)
-        print(f"{color}[{level.upper()}]{Logger.RESET}", message, *args, **kwargs)
+    def _join_print_args(values: tuple[object, ...], sep: str) -> str:
+        return sep.join("" if v is None else str(v) for v in values)
 
-    # ==========================
-    # Base logs (retrocompatible)
-    # ==========================
+    @classmethod
+    def _print(cls, level: str, *values: object, **kwargs) -> None:
+        """
+        Print-compatible wrapper:
+        accepts sep=, end=, file=, flush= like print().
+        """
+        sep = kwargs.pop("sep", " ")
+        end = kwargs.pop("end", "\n")
+        file = kwargs.pop("file", None)
+        flush = kwargs.pop("flush", False)
 
-    @staticmethod
-    def debug(message, *args, **kwargs):
-        """Color: **GREEN**. Use: debugging / dev traces."""
-        Logger._print(message, "debug", *args, **kwargs)
+        prefix = f"[{level.upper()}]"
+        message = cls._join_print_args(values, sep=sep)
 
-    @staticmethod
-    def info(message, *args, **kwargs):
-        """Color: **BLUE**. Use: general info (startup, status)."""
-        Logger._print(message, "info", *args, **kwargs)
+        if not cls.ENABLED:
+            print(f"{prefix} {message}", end=end, file=file, flush=flush)
+            return
 
-    @staticmethod
-    def warning(message, *args, **kwargs):
-        """Color: **YELLOW**. Use: warnings (non-fatal issues)."""
-        Logger._print(message, "warning", *args, **kwargs)
+        color = cls.COLORS.get(level, cls.RESET)
 
-    @staticmethod
-    def error(message, *args, **kwargs):
-        """Color: **RED**. Use: errors (exceptions, failures)."""
-        Logger._print(message, "error", *args, **kwargs)
+        if level == "title":
+            # Title is intentionally bold blue regardless of style
+            out = f"{color}{cls.BOLD}{prefix} {message}{cls.RESET}"
+            print(out, end=end, file=file, flush=flush)
+            return
 
-    @staticmethod
-    def library(message, *args, **kwargs):
-        """Color: **MAGENTA**. Use: library/tooling logs (internal helpers)."""
-        Logger._print(message, "library", *args, **kwargs)
+        if cls.STYLE == "prefix":
+            out = f"{color}{prefix}{cls.RESET} {message}"
+        elif cls.STYLE == "soft":
+            out = f"{color}{cls.BOLD}{prefix}{cls.RESET} {color}{cls.DIM}{message}{cls.RESET}"
+        else:  # "full"
+            out = f"{color}{prefix} {message}{cls.RESET}"
 
-    # ==========================
-    # Operation state
-    # ==========================
+        print(out, end=end, file=file, flush=flush)
 
-    @staticmethod
-    def success(message, *args, **kwargs):
-        """Color: **GREEN**. Use: success states (deploy ok, done)."""
-        Logger._print(message, "success", *args, **kwargs)
+    # ====== Base levels ======
 
     @staticmethod
-    def ok(message, *args, **kwargs):
-        """Color: **GREEN**. Use: quick confirmations (healthcheck ok)."""
-        Logger._print(message, "ok", *args, **kwargs)
+    def debug(*values: object, **kwargs) -> None:
+        """GREEN: debug-level logs."""
+        Logger._print("debug", *values, **kwargs)
 
     @staticmethod
-    def fail(message, *args, **kwargs):
-        """Color: **RED**. Use: explicit failure states (operation failed)."""
-        Logger._print(message, "fail", *args, **kwargs)
+    def info(*values: object, **kwargs) -> None:
+        """BLUE: informational logs."""
+        Logger._print("info", *values, **kwargs)
 
     @staticmethod
-    def critical(message, *args, **kwargs):
-        """Color: **RED**. Use: fatal/stop-the-world problems."""
-        Logger._print(message, "critical", *args, **kwargs)
-
-    # ==========================
-    # Terminal UX / flow helpers
-    # ==========================
+    def warning(*values: object, **kwargs) -> None:
+        """YELLOW: warning logs."""
+        Logger._print("warning", *values, **kwargs)
 
     @staticmethod
-    def step(message, *args, **kwargs):
-        """Color: **CYAN**. Use: step markers (Step 1/3, etc.)."""
-        Logger._print(message, "step", *args, **kwargs)
+    def error(*values: object, **kwargs) -> None:
+        """RED: error logs."""
+        Logger._print("error", *values, **kwargs)
 
     @staticmethod
-    def title(message, *args, **kwargs):
-        """Color: **BOLD BLUE**. Use: section headers / separators."""
-        Logger._print(message, "title", *args, **kwargs)
+    def library(*values: object, **kwargs) -> None:
+        """MAGENTA: library/internal logs."""
+        Logger._print("library", *values, **kwargs)
 
     @staticmethod
-    def note(message, *args, **kwargs):
-        """Color: **GRAY**. Use: low-priority notes (quiet debug)."""
-        Logger._print(message, "note", *args, **kwargs)
+    def success(*values: object, **kwargs) -> None:
+        """GREEN: success logs (semantic alias)."""
+        Logger._print("success", *values, **kwargs)
 
-    # ==========================
-    # Math / metrics vibe
-    # ==========================
+    # ====== Helpers (requested) ======
 
     @staticmethod
-    def math(message, *args, **kwargs):
-        """Color: **CYAN**. Use: math-related traces / explanations."""
-        Logger._print(message, "math", *args, **kwargs)
+    def step(*values: object, **kwargs) -> None:
+        """CYAN: step/progress logs (useful for workflows)."""
+        Logger._print("step", *values, **kwargs)
 
     @staticmethod
-    def metric(message, *args, **kwargs):
-        """Color: **MAGENTA**. Use: key metrics (loss, acc, latency)."""
-        Logger._print(message, "metric", *args, **kwargs)
+    def note(*values: object, **kwargs) -> None:
+        """GRAY: low-priority notes (quiet, non-intrusive)."""
+        Logger._print("note", *values, **kwargs)
+
+    @staticmethod
+    def title(*values: object, **kwargs) -> None:
+        """BOLD BLUE: section titles (high visibility)."""
+        Logger._print("title", *values, **kwargs)
+
+    @staticmethod
+    def metric(*values: object, **kwargs) -> None:
+        """MAGENTA: metrics/log lines (loss/acc/latency/etc)."""
+        Logger._print("metric", *values, **kwargs)
