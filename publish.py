@@ -56,7 +56,7 @@ def publish(env_file: str = ".env.secret"):
     subprocess.run(["uv", "publish"], cwd=root, check=True, env=env)
 
     log.info(
-        f"✅ Published whatsapp-toolkit {version} to PyPI. link: https://pypi.org/project/colorstreak/"
+        f"✅ Published colorstreak {version} to PyPI. link: https://pypi.org/project/colorstreak/"
     )
 
 
