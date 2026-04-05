@@ -10,6 +10,7 @@ from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime
 from difflib import unified_diff
+from pathlib import Path
 from typing import Any, Iterator
 
 from rich.console import Console
@@ -90,7 +91,7 @@ class RichLogger:
 
     def _format_metadata(self, meta: dict[str, Any]) -> str:
         parts: list[str] = []
-        parts.append(f"[log.metadata]\U0001f4cd {meta['file']}:{meta['line']} \u2192 {meta['function']}()[/]")
+        parts.append(f"[log.metadata]at {meta['file']}:{meta['line']} \u2192 {meta['function']}()[/]")
         if self._timestamp:
             ts = datetime.now().strftime("%H:%M:%S")
             parts.append(f"[log.timestamp]{ts}[/]")
@@ -409,15 +410,48 @@ class RichLogger:
 
     _SECRET_KEYWORDS = {"SECRET", "KEY", "TOKEN", "PASSWORD", "PASS", "CREDENTIAL", "AUTH"}
 
+    @staticmethod
+    def _discover_env_vars(caller_path: str) -> dict[str, str | None]:
+        """Parse variable names and values from .env* files in the project root."""
+        caller_dir = Path(caller_path).resolve().parent
+        project_root = RichLogger._find_project_root(caller_dir)
+        env_vars: dict[str, str | None] = {}
+        for env_file in sorted(project_root.glob(".env*")):
+            if not env_file.is_file():
+                continue
+            try:
+                for line in env_file.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" in line:
+                        key, _, val = line.partition("=")
+                        key = key.strip()
+                        val = val.strip().strip("'\"")
+                        if key and key not in env_vars:
+                            env_vars[key] = val or None
+            except (PermissionError, UnicodeDecodeError):
+                continue
+        return env_vars
+
     def env(self, *names: str) -> None:
+        """Show environment variables. If no names given, auto-discover from .env* files."""
         meta = get_caller_metadata(2)
+        discovered: dict[str, str | None] = {}
+        if not names:
+            discovered = self._discover_env_vars(meta["path"])
+            if not discovered:
+                self.note("No .env* files found in project root")
+                return
+            names = tuple(discovered.keys())
         text = Text()
-        text.append(" \U0001f510 ENV\n", style="bold cyan")
+        text.append(" ENV\n", style="bold cyan")
 
         for i, name in enumerate(names):
             is_last = i == len(names) - 1
             prefix = "\u2514\u2500\u2500" if is_last else "\u251c\u2500\u2500"
-            value = os.environ.get(name)
+            # Prefer os.environ, fall back to value read from .env file
+            value = os.environ.get(name) or discovered.get(name)
 
             if value is None:
                 text.append(f" {prefix} {name:<20}: ", style="dim")
@@ -480,11 +514,62 @@ class RichLogger:
     # P3 — log.tree()
     # ══════════════════════════════════════════════════════════════
 
-    def tree(self, label: str, data: dict[str, Any]) -> None:
+    def tree(
+        self,
+        label: str | None = None,
+        data: dict[str, Any] | None = None,
+        *,
+        max_depth: int = 4,
+    ) -> None:
+        """Show a tree structure. If no data given, auto-discover from project root."""
         meta = get_caller_metadata(2)
-        root = Tree(f"\U0001f333 {escape(label)}")
+        if data is None:
+            caller_path = Path(meta["path"]).resolve()
+            project_root = self._find_project_root(caller_path.parent)
+            label = label or project_root.name
+            data = self._scan_directory(project_root, max_depth=max_depth)
+        else:
+            label = label or "."
+        root = Tree(f"[bold]{escape(label)}[/]")
         self._build_tree(root, data)
         self._print(root, meta=meta)
+
+    @staticmethod
+    def _find_project_root(start: Path) -> Path:
+        """Walk up to find project root (pyproject.toml, package.json, .git, etc.)."""
+        markers = {"pyproject.toml", "setup.py", "package.json", "Cargo.toml", ".git"}
+        current = start
+        while current != current.parent:
+            if any((current / m).exists() for m in markers):
+                return current
+            current = current.parent
+        return start
+
+    _IGNORED_DIRS = {
+        ".git", ".venv", "venv", "__pycache__", "node_modules",
+        ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist",
+        "build", ".egg-info", ".tox", ".nox",
+    }
+
+    def _scan_directory(self, root: Path, *, max_depth: int, _depth: int = 0) -> dict[str, Any]:
+        """Recursively scan directory into a dict for tree rendering."""
+        result: dict[str, Any] = {}
+        if _depth >= max_depth:
+            return result
+        try:
+            entries = sorted(root.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+        except PermissionError:
+            return result
+        for entry in entries:
+            if entry.name.startswith(".") and entry.name != ".env":
+                continue
+            if entry.is_dir():
+                if entry.name in self._IGNORED_DIRS or entry.name.endswith(".egg-info"):
+                    continue
+                result[entry.name] = self._scan_directory(entry, max_depth=max_depth, _depth=_depth + 1)
+            else:
+                result[entry.name] = None
+        return result
 
     def _build_tree(self, parent: Tree, data: dict[str, Any]) -> None:
         for key, value in data.items():

@@ -26,8 +26,7 @@ def demo_base_levels():
     log.step("Paso 1/3: Verificando dependencias...")
     log.note("Nota: esto es baja prioridad")
     log.metric("loss=0.1234 acc=0.9876 latency_ms=42")
-    log.title("=== Sección: Resultados ===")
-    print()
+    log.title("=== Sección: Resultados ===\n")
 
 
 def demo_level_filtering():
@@ -38,8 +37,7 @@ def demo_level_filtering():
     filtered_log.debug("NO deberías ver esto")
     filtered_log.info("NI esto")
     filtered_log.warning("Esto SÍ se muestra")
-    filtered_log.error("Y esto también")
-    print()
+    filtered_log.error("Y esto también\n")
 
 
 def demo_table():
@@ -63,7 +61,7 @@ def demo_table():
             ["Disco", "91%", "🔴"],
         ],
     )
-    print()
+    log.note("\n")
 
 
 def demo_json():
@@ -80,7 +78,7 @@ def demo_json():
             "endpoints": ["/api/v1", "/api/v2"],
         },
     })
-    print()
+    log.note("\n")
 
 
 def demo_exception():
@@ -90,8 +88,7 @@ def demo_exception():
     try:
         result = 1 / 0
     except ZeroDivisionError:
-        log.exception("Algo salió mal en el cálculo")
-    print()
+        log.exception("Algo salió mal en el cálculo\n")
 
 
 def demo_benchmark():
@@ -103,7 +100,7 @@ def demo_benchmark():
 
     with log.benchmark("Operación lenta", slow_threshold=0.05):
         time.sleep(0.2)
-    print()
+    log.note("\n")
 
 
 def demo_group():
@@ -117,8 +114,7 @@ def demo_group():
             log.step("Ejecutando migración 001...")
             log.step("Ejecutando migración 002...")
             log.success("Migraciones completas")
-        log.success("Todos los servicios listos")
-    print()
+        log.success("Todos los servicios listos\n")
 
 
 def demo_http():
@@ -130,7 +126,7 @@ def demo_http():
     log.http("GET", "/api/search", status=304, duration=0.008)
     log.http("PUT", "/api/users/5", status=401, duration=0.05)
     log.http("DELETE", "/api/sessions", status=500, duration=3.2)
-    print()
+    log.note("\n")
 
 
 def demo_sql():
@@ -146,7 +142,7 @@ def demo_sql():
         ORDER BY orders DESC
         LIMIT 10
     """)
-    print()
+    log.note("\n")
 
 
 def demo_header():
@@ -160,7 +156,7 @@ def demo_header():
         port=8080,
         workers=4,
     )
-    print()
+    log.note("\n")
 
 
 def demo_env():
@@ -171,9 +167,13 @@ def demo_env():
     os.environ["SECRET_KEY"] = "sk-super-secret-key-12345678"
     os.environ["DEBUG"] = "true"
 
-    log.rule("P2 — Environment Variables")
+    log.rule("P2 — Environment Variables (explicit)")
     log.env("DATABASE_URL", "REDIS_URL", "SECRET_KEY", "DEBUG", "API_TOKEN")
-    print()
+    log.note("\n")
+
+    log.rule("P2 — Environment Variables (auto-discover)")
+    log.env()
+    log.note("\n")
 
 
 def demo_inspect():
@@ -191,7 +191,7 @@ def demo_inspect():
 
     user = User("Carlos", 28, "admin")
     log.inspect(user)
-    print()
+    log.note("\n")
 
 
 def demo_code():
@@ -208,12 +208,12 @@ def fibonacci(n: int) -> int:
 for i in range(10):
     print(fibonacci(i), end=" ")
     """, title="Fibonacci recursivo")
-    print()
+    log.note("\n")
 
 
 def demo_tree():
     """P3: Estructuras jerárquicas."""
-    log.rule("P3 — Tree")
+    log.rule("P3 — Tree (manual)")
 
     log.tree("Mi Proyecto", {
         "src": {
@@ -231,7 +231,11 @@ def demo_tree():
         "README.md": None,
         "pyproject.toml": None,
     })
-    print()
+    log.note("\n")
+
+    log.rule("P3 — Tree (auto-discover)")
+    log.tree()
+    log.note("\n")
 
 
 def demo_diff():
@@ -250,7 +254,7 @@ log_level=DEBUG
 cache_ttl=300"""
 
     log.diff(old_config, new_config, context="config.ini")
-    print()
+    log.note("\n")
 
 
 def demo_panel():
@@ -262,7 +266,7 @@ def demo_panel():
         title="Mantenimiento programado",
         style="warning",
     )
-    print()
+    log.note("\n")
 
 
 def demo_count():
@@ -277,7 +281,7 @@ def demo_count():
         log.count("errors")
 
     log.count_summary(title="Resumen de operaciones")
-    print()
+    log.note("\n")
 
 
 def demo_styles():
@@ -286,15 +290,15 @@ def demo_styles():
 
     for style in ("panel", "inline", "minimal"):
         styled = RichLogger(style=style, timestamp=False)
-        print(f"\n  style={style!r}:")
+        styled.info(f"\n  style={style!r}:")
         styled.info("Mensaje de ejemplo")
         styled.warning("Advertencia de ejemplo")
         styled.error("Error de ejemplo")
-    print()
+    log.note("\n")
 
 
 def main():
-    print("\n")
+    log.note("\n")
     log.header("RichLogger Demo", version="1.0.0", features="20")
 
     demo_base_levels()

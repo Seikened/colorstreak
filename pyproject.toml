@@ -9,3 +9,6 @@ dependencies = [
     "typer>=0.21.1",
     "rich>=13.0.0",
 ]
+
+
+optional-dependencies =  {typer = ["typer>=0.21.1"]}
