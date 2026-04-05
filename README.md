@@ -1,47 +1,51 @@
 
 # colorstreak
 
-`colorstreak` es una mini-lib para imprimir logs en la terminal con colores ANSI, sin acoplarte a un framework de logging.
-La API está pensada para sentirse como `print()` (acepta `sep`, `end`, `file`, `flush`) pero con niveles semánticos.
+Minimal color logging for Python terminals. Two loggers in one package:
 
-## ¿Qué resuelve?
+- **`Logger`** — zero-dependency ANSI logger that works like `print()`
+- **`RichLogger`** — feature-rich logger powered by [Rich](https://github.com/Textualize/rich) with tables, JSON, trees, benchmarks, and more
 
-- Salida de terminal más legible (debug/info/warning/error/success, etc.).
-- Un prefijo consistente por nivel (ej: `[INFO]`).
-- Control simple del estilo (solo prefijo, todo coloreado, o “soft”).
-- Compatibilidad con `NO_COLOR` para desactivar colores.
-
-## Instalación
+## Instalacion
 
 ```bash
 pip install colorstreak
 ```
 
-## Uso rápido
+---
+
+## Logger (basico)
+
+ANSI puro, sin dependencias. Se siente como `print()`.
 
 ```python
 from colorstreak import Logger
 
 Logger.info("Servidor arriba")
-Logger.warning("Cache fría")
+Logger.warning("Cache fria")
 Logger.error("No se pudo conectar")
 Logger.success("Deploy OK")
 ```
 
-## Estilos
+### Niveles disponibles
 
-Hay 3 estilos de salida:
+| Metodo | Color |
+|---|---|
+| `Logger.debug()` | Verde |
+| `Logger.info()` | Azul |
+| `Logger.warning()` | Amarillo |
+| `Logger.error()` | Rojo |
+| `Logger.success()` | Verde |
+| `Logger.library()` | Magenta |
+| `Logger.step()` | Cyan |
+| `Logger.note()` | Gris |
+| `Logger.title()` | Azul bold |
+| `Logger.metric()` | Magenta |
 
-- `full` (default): prefijo y mensaje coloreados
-- `prefix`: solo el prefijo coloreado
-- `soft`: prefijo resaltado y mensaje atenuado
-
-Configúralo en runtime:
+### Estilos
 
 ```python
-from colorstreak import Logger
-
-Logger.configure(style="soft")
+Logger.configure(style="soft")  # "full" (default) | "prefix" | "soft"
 ```
 
 O por variable de entorno:
@@ -50,40 +54,236 @@ O por variable de entorno:
 export COLORSTREAK_STYLE=prefix
 ```
 
-## Desactivar colores
+### Compatible con print()
 
-Si tu entorno no soporta ANSI o quieres logs “planos”, usa `NO_COLOR`:
+```python
+Logger.info("Multiple", "args", 123, sep=" | ")
+Logger.warning("Sin salto...", end="")
+```
+
+### Desactivar colores
 
 ```bash
 export NO_COLOR=1
 ```
 
-## Niveles disponibles
+---
 
-Base:
+## RichLogger (avanzado)
 
-- `Logger.debug()`
-- `Logger.info()`
-- `Logger.warning()`
-- `Logger.error()`
-- `Logger.library()`
-- `Logger.success()`
-
-Helpers:
-
-- `Logger.step()`
-- `Logger.note()`
-- `Logger.title()`
-- `Logger.metric()`
-
-## Compatible con print()
-
-Cada método acepta `sep=`, `end=`, `file=`, `flush=` igual que `print()`:
+Logger con Rich para output profesional en terminal.
 
 ```python
-from colorstreak import Logger
+from colorstreak import RichLogger
 
-Logger.info("Multiple", "args", 123, sep=" | ")
-Logger.warning("Sin salto...", end="")
-Logger.warning(" <- continúa")
+log = RichLogger(style="inline")
 ```
+
+### Configuracion
+
+```python
+log = RichLogger(
+    level="DEBUG",       # nivel minimo: DEBUG, INFO, WARNING, ERROR, CRITICAL
+    style="inline",      # "panel" | "inline" | "minimal"
+    metadata=True,       # muestra archivo:linea en cada log
+    timestamp=True,      # muestra hora
+)
+```
+
+### Niveles
+
+```python
+log.debug("Mensaje de debug")
+log.info("Servidor iniciado en puerto 8080")
+log.warning("Cache expirado")
+log.error("No se pudo conectar a la DB")
+log.critical("Sistema de archivos lleno")
+log.success("Deploy completado")
+log.library("Cargando modulo: colorstreak")
+log.step("Paso 1/3: Verificando...")
+log.note("Nota de baja prioridad")
+log.metric("loss=0.1234 acc=0.9876")
+log.title("=== Seccion: Resultados ===")
+```
+
+### Filtrado por nivel
+
+```python
+log = RichLogger(level="WARNING")
+log.debug("No se muestra")
+log.warning("Esto si")
+```
+
+### Tablas
+
+```python
+# Desde lista de dicts
+log.table([
+    {"ID": 1, "Nombre": "Carlos", "Rol": "Admin"},
+    {"ID": 2, "Nombre": "Maria", "Rol": "Editor"},
+], title="Usuarios")
+
+# Desde columns + rows
+log.table(
+    columns=["Metrica", "Valor"],
+    rows=[["CPU", "42%"], ["RAM", "78%"]],
+)
+```
+
+### JSON
+
+```python
+log.json({
+    "status": "ok",
+    "config": {"timeout": 30, "retries": 3},
+})
+```
+
+### Excepciones
+
+```python
+try:
+    result = 1 / 0
+except ZeroDivisionError:
+    log.exception("Algo salio mal")
+```
+
+### Benchmark
+
+```python
+with log.benchmark("Operacion pesada", slow_threshold=1.0):
+    time.sleep(0.5)
+```
+
+### Grupos
+
+```python
+with log.group("Inicializando servicios"):
+    log.info("Conectando a Redis...")
+    log.success("Listo")
+```
+
+### HTTP
+
+```python
+log.http("GET", "/api/users", status=200, duration=0.045)
+log.http("POST", "/api/login", status=201, duration=0.12)
+log.http("DELETE", "/api/sessions", status=500, duration=3.2)
+```
+
+### SQL
+
+```python
+log.sql("""
+    SELECT u.name, COUNT(o.id) as orders
+    FROM users u
+    LEFT JOIN orders o ON o.user_id = u.id
+    WHERE u.active = true
+    LIMIT 10
+""")
+```
+
+### Header (banner de inicio)
+
+```python
+log.header(
+    "Mi API",
+    version="1.0.0",
+    env="production",
+    port=8080,
+)
+```
+
+### Variables de entorno
+
+```python
+# Explicito: muestra solo las que pidas
+log.env("DATABASE_URL", "REDIS_URL", "SECRET_KEY")
+
+# Auto-discover: lee las variables de los archivos .env* del proyecto
+log.env()
+```
+
+El auto-discover parsea todos los archivos `.env`, `.env.local`, `.env.secret`, etc. del root del proyecto. Las variables con nombres como `SECRET`, `KEY`, `TOKEN`, `PASSWORD` se enmascaran automaticamente.
+
+### Tree (estructura de directorios)
+
+```python
+# Manual: pasa tu propio dict
+log.tree("Mi Proyecto", {
+    "src": {"main.py": None, "utils.py": None},
+    "tests": {"test_main.py": None},
+    "README.md": None,
+})
+
+# Auto-discover: escanea el proyecto desde el root
+log.tree()
+
+# Con profundidad maxima
+log.tree(max_depth=2)
+```
+
+El auto-discover detecta el root del proyecto buscando `pyproject.toml`, `package.json`, `.git`, etc. Ignora carpetas como `.git`, `__pycache__`, `.venv`, `node_modules`.
+
+### Inspect
+
+```python
+log.inspect(mi_objeto)
+log.inspect(mi_objeto, methods=True)
+```
+
+### Code
+
+```python
+log.code("""
+def fibonacci(n: int) -> int:
+    if n <= 1:
+        return n
+    return fibonacci(n - 1) + fibonacci(n - 2)
+""", title="Fibonacci", language="python")
+```
+
+### Diff
+
+```python
+log.diff(old_text, new_text, context="config.ini")
+```
+
+### Panel
+
+```python
+log.panel(
+    "El servidor se reiniciara en 30 segundos.",
+    title="Mantenimiento",
+    style="warning",  # "info" | "warning" | "error" | "success"
+)
+```
+
+### Contadores
+
+```python
+for request in requests:
+    log.count("requests_processed")
+
+log.count_summary(title="Resumen")
+```
+
+### Log a archivo
+
+```python
+log.to_file("output.log")
+# A partir de aqui, todo se escribe tambien al archivo (sin colores)
+```
+
+### Regla visual
+
+```python
+log.rule("Seccion importante")
+```
+
+---
+
+## Requisitos
+
+- Python >= 3.10
+- `rich` (se instala automaticamente)
